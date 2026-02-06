@@ -1,155 +1,374 @@
-import type { Recipe } from '@/types/recipe';
+/**
+ * Recipe Extractor Service
+ * 
+ * HOW IT WORKS:
+ * 1. Takes a URL from the user
+ * 2. Uses a CORS proxy to fetch the actual webpage HTML
+ * 3. Parses the HTML looking for recipe data in two ways:
+ *    a. JSON-LD structured data (most recipe sites use this for SEO)
+ *    b. Common HTML patterns/microdata as fallback
+ * 4. Extracts and formats the recipe into a clean structure
+ * 
+ * LIMITATIONS:
+ * - CORS proxies can be slow or rate-limited
+ * - Some sites block proxies
+ * - In production, you'd want your own backend server
+ * - For better extraction, you'd integrate an LLM API (OpenAI, etc.)
+ */
 
-// Sample recipes that simulate LLM extraction results
-const sampleRecipes: Record<string, Recipe> = {
-  default: {
-    title: 'Classic Chocolate Chip Cookies',
-    description: 'Soft and chewy chocolate chip cookies with a perfectly golden exterior.',
-    prepTime: '15 min',
-    cookTime: '12 min',
-    totalTime: '27 min',
-    servings: '24 cookies',
-    ingredients: [
-      { amount: '2¼', unit: 'cups', item: 'all-purpose flour' },
-      { amount: '1', unit: 'tsp', item: 'baking soda' },
-      { amount: '1', unit: 'tsp', item: 'salt' },
-      { amount: '1', unit: 'cup', item: 'butter', notes: 'softened' },
-      { amount: '¾', unit: 'cup', item: 'granulated sugar' },
-      { amount: '¾', unit: 'cup', item: 'packed brown sugar' },
-      { amount: '2', unit: 'large', item: 'eggs' },
-      { amount: '1', unit: 'tsp', item: 'vanilla extract' },
-      { amount: '2', unit: 'cups', item: 'chocolate chips' },
-      { amount: '1', unit: 'cup', item: 'chopped walnuts', notes: 'optional' },
-    ],
-    instructions: [
-      { step: 1, text: 'Preheat oven to 375°F (190°C). Line baking sheets with parchment paper.' },
-      { step: 2, text: 'In a medium bowl, whisk together flour, baking soda, and salt. Set aside.' },
-      { step: 3, text: 'In a large bowl, beat butter and both sugars until light and fluffy, about 3-4 minutes.' },
-      { step: 4, text: 'Add eggs one at a time, beating well after each addition. Mix in vanilla extract.' },
-      { step: 5, text: 'Gradually add flour mixture to butter mixture, mixing on low speed until just combined.' },
-      { step: 6, text: 'Fold in chocolate chips and walnuts (if using) with a spatula.' },
-      { step: 7, text: 'Drop rounded tablespoons of dough onto prepared baking sheets, spacing 2 inches apart.' },
-      { step: 8, text: 'Bake for 9-12 minutes, or until edges are golden but centers look slightly underdone.' },
-      { step: 9, text: 'Let cool on baking sheet for 5 minutes before transferring to a wire rack.' },
-    ],
-    sourceUrl: '',
-    extractedAt: new Date().toISOString(),
-  },
-  pasta: {
-    title: 'Creamy Garlic Tuscan Shrimp',
-    description: 'Succulent shrimp in a creamy garlic parmesan sauce with sun-dried tomatoes and spinach.',
-    prepTime: '10 min',
-    cookTime: '20 min',
-    totalTime: '30 min',
-    servings: '4 servings',
-    ingredients: [
-      { amount: '1', unit: 'lb', item: 'large shrimp', notes: 'peeled and deveined' },
-      { amount: '8', unit: 'oz', item: 'penne pasta' },
-      { amount: '4', unit: 'cloves', item: 'garlic', notes: 'minced' },
-      { amount: '1', unit: 'cup', item: 'heavy cream' },
-      { amount: '½', unit: 'cup', item: 'chicken broth' },
-      { amount: '¾', unit: 'cup', item: 'parmesan cheese', notes: 'freshly grated' },
-      { amount: '½', unit: 'cup', item: 'sun-dried tomatoes', notes: 'drained and chopped' },
-      { amount: '3', unit: 'cups', item: 'fresh spinach' },
-      { amount: '2', unit: 'tbsp', item: 'olive oil' },
-      { amount: '1', unit: 'tsp', item: 'Italian seasoning' },
-      { amount: '', unit: '', item: 'Salt and pepper', notes: 'to taste' },
-    ],
-    instructions: [
-      { step: 1, text: 'Cook pasta according to package directions. Drain and set aside, reserving ½ cup pasta water.' },
-      { step: 2, text: 'Season shrimp with salt, pepper, and Italian seasoning.' },
-      { step: 3, text: 'Heat olive oil in a large skillet over medium-high heat. Cook shrimp for 2 minutes per side until pink. Remove and set aside.' },
-      { step: 4, text: 'In the same skillet, sauté garlic for 30 seconds until fragrant.' },
-      { step: 5, text: 'Add heavy cream and chicken broth. Bring to a simmer and cook for 3 minutes.' },
-      { step: 6, text: 'Stir in parmesan cheese until melted and smooth.' },
-      { step: 7, text: 'Add sun-dried tomatoes and spinach. Cook until spinach is wilted, about 2 minutes.' },
-      { step: 8, text: 'Return shrimp to the skillet along with the cooked pasta. Toss to coat.' },
-      { step: 9, text: 'If sauce is too thick, add reserved pasta water a little at a time. Serve immediately.' },
-    ],
-    sourceUrl: '',
-    extractedAt: new Date().toISOString(),
-  },
-  soup: {
-    title: 'Homemade Chicken Noodle Soup',
-    description: 'Comforting homemade chicken noodle soup with tender vegetables and herbs.',
-    prepTime: '20 min',
-    cookTime: '40 min',
-    totalTime: '1 hour',
-    servings: '8 servings',
-    ingredients: [
-      { amount: '2', unit: 'tbsp', item: 'olive oil' },
-      { amount: '1', unit: 'lb', item: 'chicken breast', notes: 'boneless, skinless' },
-      { amount: '3', unit: 'stalks', item: 'celery', notes: 'diced' },
-      { amount: '3', unit: 'medium', item: 'carrots', notes: 'peeled and diced' },
-      { amount: '1', unit: 'large', item: 'onion', notes: 'diced' },
-      { amount: '4', unit: 'cloves', item: 'garlic', notes: 'minced' },
-      { amount: '8', unit: 'cups', item: 'chicken broth' },
-      { amount: '2', unit: 'cups', item: 'egg noodles' },
-      { amount: '2', unit: 'bay leaves', item: '' },
-      { amount: '1', unit: 'tsp', item: 'dried thyme' },
-      { amount: '¼', unit: 'cup', item: 'fresh parsley', notes: 'chopped' },
-      { amount: '', unit: '', item: 'Salt and pepper', notes: 'to taste' },
-    ],
-    instructions: [
-      { step: 1, text: 'Heat olive oil in a large pot or Dutch oven over medium heat.' },
-      { step: 2, text: 'Season chicken with salt and pepper. Cook for 6-7 minutes per side until golden. Remove and set aside.' },
-      { step: 3, text: 'Add celery, carrots, and onion to the pot. Sauté for 5 minutes until softened.' },
-      { step: 4, text: 'Add garlic and cook for 1 minute until fragrant.' },
-      { step: 5, text: 'Pour in chicken broth and add bay leaves and thyme. Bring to a boil.' },
-      { step: 6, text: 'Return chicken to the pot. Reduce heat and simmer for 20 minutes.' },
-      { step: 7, text: 'Remove chicken and shred with two forks. Return to the pot.' },
-      { step: 8, text: 'Add egg noodles and cook for 8-10 minutes until tender.' },
-      { step: 9, text: 'Remove bay leaves. Stir in fresh parsley and adjust seasoning. Serve hot.' },
-    ],
-    sourceUrl: '',
-    extractedAt: new Date().toISOString(),
-  },
-};
+import { Recipe, Ingredient, Instruction } from '../types/recipe';
 
-// Simulate LLM extraction with a delay
+// List of CORS proxies to try (free ones, may be rate-limited)
+const CORS_PROXIES = [
+  'https://api.allorigins.win/raw?url=',
+  'https://corsproxy.io/?',
+  'https://api.codetabs.com/v1/proxy?quest=',
+];
+
+/**
+ * Fetches HTML from a URL using CORS proxies
+ */
+async function fetchWithCorsProxy(url: string): Promise<string> {
+  let lastError: Error | null = null;
+  
+  for (const proxy of CORS_PROXIES) {
+    try {
+      console.log(`🌐 Trying proxy: ${proxy}`);
+      const response = await fetch(proxy + encodeURIComponent(url), {
+        headers: {
+          'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+        },
+      });
+      
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}`);
+      }
+      
+      const html = await response.text();
+      console.log(`✅ Successfully fetched ${html.length} characters`);
+      return html;
+    } catch (error) {
+      console.warn(`❌ Proxy failed: ${proxy}`, error);
+      lastError = error as Error;
+    }
+  }
+  
+  throw new Error(`Failed to fetch URL. All proxies failed. Last error: ${lastError?.message}`);
+}
+
+/**
+ * Extracts JSON-LD structured data from HTML
+ * Most recipe websites include this for SEO/Google
+ */
+function extractJsonLd(html: string): any | null {
+  const jsonLdRegex = /<script[^>]*type=["']application\/ld\+json["'][^>]*>([\s\S]*?)<\/script>/gi;
+  let match;
+  
+  while ((match = jsonLdRegex.exec(html)) !== null) {
+    try {
+      const jsonText = match[1].trim();
+      const data = JSON.parse(jsonText);
+      
+      // Handle arrays of JSON-LD objects
+      const items = Array.isArray(data) ? data : [data];
+      
+      for (const item of items) {
+        // Check if this is a Recipe type
+        if (item['@type'] === 'Recipe') {
+          console.log('📋 Found Recipe JSON-LD:', item);
+          return item;
+        }
+        
+        // Check @graph for Recipe
+        if (item['@graph']) {
+          const recipe = item['@graph'].find((g: any) => 
+            g['@type'] === 'Recipe' || 
+            (Array.isArray(g['@type']) && g['@type'].includes('Recipe'))
+          );
+          if (recipe) {
+            console.log('📋 Found Recipe in @graph:', recipe);
+            return recipe;
+          }
+        }
+      }
+    } catch (e) {
+      // Invalid JSON, continue to next script tag
+      console.warn('Failed to parse JSON-LD:', e);
+    }
+  }
+  
+  return null;
+}
+
+/**
+ * Parses an ISO 8601 duration (PT1H30M) to human readable format
+ */
+function parseDuration(duration: string | undefined): string {
+  if (!duration) return '';
+  
+  const match = duration.match(/PT(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?/);
+  if (!match) return duration;
+  
+  const hours = match[1] ? parseInt(match[1]) : 0;
+  const minutes = match[2] ? parseInt(match[2]) : 0;
+  
+  const parts: string[] = [];
+  if (hours > 0) parts.push(`${hours} hour${hours > 1 ? 's' : ''}`);
+  if (minutes > 0) parts.push(`${minutes} min`);
+  
+  return parts.join(' ') || '';
+}
+
+/**
+ * Parses ingredient text into structured format
+ */
+function parseIngredient(text: string): Ingredient {
+  // Clean up the text
+  const cleaned = text.trim().replace(/\s+/g, ' ');
+  
+  // Try to extract amount, unit, and item
+  // Pattern: "1 1/2 cups all-purpose flour, sifted"
+  const match = cleaned.match(/^([\d\/\.\s]+)?\s*(cups?|tbsp|tsp|tablespoons?|teaspoons?|oz|ounces?|lbs?|pounds?|g|grams?|kg|ml|liters?|quarts?|pints?|pieces?|cloves?|slices?|large|medium|small|whole)?\s*(.+?)(?:,\s*(.+))?$/i);
+  
+  if (match) {
+    return {
+      amount: (match[1] || '').trim(),
+      unit: (match[2] || '').trim(),
+      item: (match[3] || cleaned).trim(),
+      notes: match[4]?.trim(),
+    };
+  }
+  
+  return {
+    amount: '',
+    unit: '',
+    item: cleaned,
+  };
+}
+
+/**
+ * Converts JSON-LD recipe data to our Recipe format
+ */
+function jsonLdToRecipe(jsonLd: any, sourceUrl: string): Recipe {
+  // Handle ingredients - can be strings or objects
+  const ingredients: Ingredient[] = [];
+  const rawIngredients = jsonLd.recipeIngredient || jsonLd.ingredients || [];
+  
+  for (const ing of rawIngredients) {
+    if (typeof ing === 'string') {
+      ingredients.push(parseIngredient(ing));
+    } else if (ing.name) {
+      ingredients.push({
+        amount: ing.amount || '',
+        unit: ing.unit || '',
+        item: ing.name,
+        notes: ing.notes,
+      });
+    }
+  }
+  
+  // Handle instructions - can be strings, objects, or HowToSection
+  const instructionTexts: string[] = [];
+  const rawInstructions = jsonLd.recipeInstructions || [];
+  
+  function extractInstructionTexts(items: any[]) {
+    for (const item of items) {
+      if (typeof item === 'string') {
+        instructionTexts.push(item.trim());
+      } else if (item['@type'] === 'HowToStep') {
+        instructionTexts.push(item.text?.trim() || item.name?.trim() || '');
+      } else if (item['@type'] === 'HowToSection') {
+        // Add section name as a header
+        if (item.name) {
+          instructionTexts.push(`**${item.name}**`);
+        }
+        if (item.itemListElement) {
+          extractInstructionTexts(item.itemListElement);
+        }
+      } else if (item.text) {
+        instructionTexts.push(item.text.trim());
+      }
+    }
+  }
+  
+  if (Array.isArray(rawInstructions)) {
+    extractInstructionTexts(rawInstructions);
+  } else if (typeof rawInstructions === 'string') {
+    // Split by newlines or periods for run-on instructions
+    rawInstructions.split(/\n|(?<=\.)\s+(?=[A-Z])/).forEach((s: string) => {
+      const trimmed = s.trim();
+      if (trimmed) instructionTexts.push(trimmed);
+    });
+  }
+  
+  // Convert to Instruction[] format with step numbers
+  const instructions: Instruction[] = instructionTexts
+    .filter(Boolean)
+    .map((text, index) => ({ step: index + 1, text }));
+  
+  // Handle servings
+  let servings = '';
+  if (jsonLd.recipeYield) {
+    servings = Array.isArray(jsonLd.recipeYield) 
+      ? jsonLd.recipeYield[0] 
+      : String(jsonLd.recipeYield);
+  }
+  
+  // Note: Image URL is available in jsonLd.image but not currently used in our Recipe type
+  
+  return {
+    title: jsonLd.name || 'Untitled Recipe',
+    description: jsonLd.description || '',
+    prepTime: parseDuration(jsonLd.prepTime),
+    cookTime: parseDuration(jsonLd.cookTime),
+    totalTime: parseDuration(jsonLd.totalTime),
+    servings,
+    ingredients,
+    instructions,
+    sourceUrl,
+    extractedAt: new Date().toISOString(),
+  };
+}
+
+/**
+ * Fallback: Extract recipe from HTML using common patterns
+ */
+function extractFromHtml(html: string, sourceUrl: string): Recipe | null {
+  const parser = new DOMParser();
+  const doc = parser.parseFromString(html, 'text/html');
+  
+  // Try to find recipe title
+  let title = '';
+  const titleSelectors = [
+    'h1.recipe-title',
+    'h1.entry-title',
+    '.recipe-name h1',
+    'h1[itemprop="name"]',
+    '.wprm-recipe-name',
+    'h2.wprm-recipe-name',
+    'article h1',
+    'h1',
+  ];
+  
+  for (const selector of titleSelectors) {
+    const el = doc.querySelector(selector);
+    if (el?.textContent?.trim()) {
+      title = el.textContent.trim();
+      break;
+    }
+  }
+  
+  // Try to find ingredients
+  const ingredients: Ingredient[] = [];
+  const ingredientSelectors = [
+    '.recipe-ingredients li',
+    '.ingredients li',
+    '[itemprop="recipeIngredient"]',
+    '.wprm-recipe-ingredient',
+    '.ingredient-list li',
+    '.recipe-ingred_txt',
+  ];
+  
+  for (const selector of ingredientSelectors) {
+    const elements = doc.querySelectorAll(selector);
+    if (elements.length > 0) {
+      elements.forEach(el => {
+        const text = el.textContent?.trim();
+        if (text) {
+          ingredients.push(parseIngredient(text));
+        }
+      });
+      break;
+    }
+  }
+  
+  // Try to find instructions
+  const instructionTexts: string[] = [];
+  const instructionSelectors = [
+    '.recipe-instructions li',
+    '.instructions li',
+    '[itemprop="recipeInstructions"] li',
+    '.wprm-recipe-instruction',
+    '.recipe-direction',
+    '.step-text',
+  ];
+  
+  for (const selector of instructionSelectors) {
+    const elements = doc.querySelectorAll(selector);
+    if (elements.length > 0) {
+      elements.forEach(el => {
+        const text = el.textContent?.trim();
+        if (text) {
+          instructionTexts.push(text);
+        }
+      });
+      break;
+    }
+  }
+  
+  // Convert to Instruction[] format
+  const instructions: Instruction[] = instructionTexts.map((text, index) => ({
+    step: index + 1,
+    text,
+  }));
+  
+  if (!title && ingredients.length === 0 && instructions.length === 0) {
+    return null;
+  }
+  
+  return {
+    title: title || 'Recipe',
+    description: '',
+    prepTime: '',
+    cookTime: '',
+    totalTime: '',
+    servings: '',
+    ingredients,
+    instructions,
+    sourceUrl,
+    extractedAt: new Date().toISOString(),
+  };
+}
+
+/**
+ * Main function: Extract recipe from a URL
+ */
 export async function extractRecipe(url: string): Promise<Recipe> {
-  // Simulate network delay for LLM processing
-  await new Promise((resolve) => setTimeout(resolve, 2000 + Math.random() * 1500));
-
-  // Determine which recipe to return based on URL keywords
-  const lowerUrl = url.toLowerCase();
+  console.log('🔍 Starting recipe extraction for:', url);
   
-  // Log for debugging
-  console.log('Extracting recipe from URL:', lowerUrl);
-  
-  let recipeKey: 'default' | 'pasta' | 'soup' = 'default';
-  
-  // Check for shrimp/tuscan pasta first
-  if (lowerUrl.includes('shrimp') || lowerUrl.includes('tuscan') || lowerUrl.includes('pasta')) {
-    recipeKey = 'pasta';
-    console.log('Matched: pasta');
-  } 
-  // Check for soup
-  else if (lowerUrl.includes('soup') || lowerUrl.includes('noodle-soup') || (lowerUrl.includes('chicken') && lowerUrl.includes('noodle'))) {
-    recipeKey = 'soup';
-    console.log('Matched: soup');
+  // Validate URL
+  try {
+    new URL(url);
+  } catch {
+    throw new Error('Invalid URL. Please enter a valid website address.');
   }
-  // Default is cookies
-  else {
-    recipeKey = 'default';
-    console.log('Matched: default (cookies)');
-  }
-
-  // Deep clone the recipe to avoid mutations
-  const recipe: Recipe = JSON.parse(JSON.stringify(sampleRecipes[recipeKey]));
-  recipe.sourceUrl = url;
-  recipe.extractedAt = new Date().toISOString();
-
-  // Randomize the title slightly based on URL to make it feel more dynamic
-  if (lowerUrl.includes('best') || lowerUrl.includes('perfect')) {
-    recipe.title = `The Perfect ${recipe.title}`;
-  } else if (lowerUrl.includes('easy') || lowerUrl.includes('simple')) {
-    recipe.title = `Easy ${recipe.title}`;
-  } else if (lowerUrl.includes('grandma') || lowerUrl.includes('mom')) {
-    recipe.title = `Grandma's ${recipe.title}`;
-  }
-
-  console.log('Returning recipe:', recipe.title);
   
-  return recipe;
+  // Fetch the webpage
+  console.log('📥 Fetching webpage...');
+  const html = await fetchWithCorsProxy(url);
+  
+  // Try to extract JSON-LD first (most reliable)
+  console.log('🔎 Looking for JSON-LD structured data...');
+  const jsonLd = extractJsonLd(html);
+  
+  if (jsonLd) {
+    console.log('✅ Found structured recipe data!');
+    return jsonLdToRecipe(jsonLd, url);
+  }
+  
+  // Fallback to HTML parsing
+  console.log('⚠️ No JSON-LD found, trying HTML parsing...');
+  const recipe = extractFromHtml(html, url);
+  
+  if (recipe && (recipe.ingredients.length > 0 || recipe.instructions.length > 0)) {
+    console.log('✅ Extracted recipe from HTML');
+    return recipe;
+  }
+  
+  // Nothing found
+  throw new Error(
+    'Could not find recipe data on this page. ' +
+    'The website may not have structured recipe data, or it may be blocking our request. ' +
+    'Try a different recipe URL from a major cooking site like AllRecipes, Food Network, or Serious Eats.'
+  );
 }
