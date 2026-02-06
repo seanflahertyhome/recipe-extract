@@ -112,29 +112,44 @@ export async function extractRecipe(url: string): Promise<Recipe> {
   await new Promise((resolve) => setTimeout(resolve, 2000 + Math.random() * 1500));
 
   // Determine which recipe to return based on URL keywords
-  let recipeKey = 'default';
   const lowerUrl = url.toLowerCase();
   
-  if (lowerUrl.includes('shrimp') || lowerUrl.includes('tuscan')) {
+  // Log for debugging
+  console.log('Extracting recipe from URL:', lowerUrl);
+  
+  let recipeKey: 'default' | 'pasta' | 'soup' = 'default';
+  
+  // Check for shrimp/tuscan pasta first
+  if (lowerUrl.includes('shrimp') || lowerUrl.includes('tuscan') || lowerUrl.includes('pasta')) {
     recipeKey = 'pasta';
-  } else if (lowerUrl.includes('soup') || (lowerUrl.includes('chicken') && lowerUrl.includes('noodle'))) {
+    console.log('Matched: pasta');
+  } 
+  // Check for soup
+  else if (lowerUrl.includes('soup') || lowerUrl.includes('noodle-soup') || (lowerUrl.includes('chicken') && lowerUrl.includes('noodle'))) {
     recipeKey = 'soup';
-  } else if (lowerUrl.includes('cookie') || lowerUrl.includes('chocolate')) {
-    recipeKey = 'default'; // cookies
+    console.log('Matched: soup');
+  }
+  // Default is cookies
+  else {
+    recipeKey = 'default';
+    console.log('Matched: default (cookies)');
   }
 
-  const recipe = { ...sampleRecipes[recipeKey] };
+  // Deep clone the recipe to avoid mutations
+  const recipe: Recipe = JSON.parse(JSON.stringify(sampleRecipes[recipeKey]));
   recipe.sourceUrl = url;
   recipe.extractedAt = new Date().toISOString();
 
   // Randomize the title slightly based on URL to make it feel more dynamic
-  if (url.includes('best') || url.includes('perfect')) {
+  if (lowerUrl.includes('best') || lowerUrl.includes('perfect')) {
     recipe.title = `The Perfect ${recipe.title}`;
-  } else if (url.includes('easy') || url.includes('simple')) {
+  } else if (lowerUrl.includes('easy') || lowerUrl.includes('simple')) {
     recipe.title = `Easy ${recipe.title}`;
-  } else if (url.includes('grandma') || url.includes('mom')) {
+  } else if (lowerUrl.includes('grandma') || lowerUrl.includes('mom')) {
     recipe.title = `Grandma's ${recipe.title}`;
   }
 
+  console.log('Returning recipe:', recipe.title);
+  
   return recipe;
 }
