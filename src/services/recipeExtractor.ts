@@ -115,10 +115,12 @@ export async function extractRecipe(url: string): Promise<Recipe> {
   let recipeKey = 'default';
   const lowerUrl = url.toLowerCase();
   
-  if (lowerUrl.includes('shrimp') || lowerUrl.includes('pasta') || lowerUrl.includes('tuscan')) {
+  if (lowerUrl.includes('shrimp') || lowerUrl.includes('tuscan')) {
     recipeKey = 'pasta';
-  } else if (lowerUrl.includes('soup') || lowerUrl.includes('chicken') && lowerUrl.includes('noodle')) {
+  } else if (lowerUrl.includes('soup') || (lowerUrl.includes('chicken') && lowerUrl.includes('noodle'))) {
     recipeKey = 'soup';
+  } else if (lowerUrl.includes('cookie') || lowerUrl.includes('chocolate')) {
+    recipeKey = 'default'; // cookies
   }
 
   const recipe = { ...sampleRecipes[recipeKey] };

@@ -8,9 +8,9 @@ interface URLInputProps {
 }
 
 const exampleUrls = [
-  { label: 'Chocolate Chip Cookies', url: 'https://example.com/best-chocolate-chip-cookies' },
-  { label: 'Tuscan Shrimp Pasta', url: 'https://example.com/creamy-tuscan-shrimp-pasta' },
-  { label: 'Chicken Noodle Soup', url: 'https://example.com/grandma-chicken-noodle-soup' },
+  { label: '🍪 Chocolate Chip Cookies', url: 'https://example.com/best-chocolate-chip-cookies-recipe' },
+  { label: '🍤 Tuscan Shrimp Pasta', url: 'https://example.com/creamy-tuscan-shrimp-pasta' },
+  { label: '🍲 Chicken Noodle Soup', url: 'https://example.com/grandma-chicken-noodle-soup' },
 ];
 
 export function URLInput({ onExtract, isLoading, className }: URLInputProps) {
@@ -117,6 +117,8 @@ export function URLInput({ onExtract, isLoading, className }: URLInputProps) {
               onClick={() => {
                 setUrl(example.url);
                 setError('');
+                // Automatically trigger extraction for demo purposes
+                onExtract(example.url);
               }}
               disabled={isLoading}
               className="px-3 py-1.5 text-sm bg-white border border-gray-200 rounded-lg hover:border-orange-300 hover:bg-orange-50 hover:text-orange-600 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
