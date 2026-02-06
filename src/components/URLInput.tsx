@@ -7,10 +7,12 @@ interface URLInputProps {
   className?: string;
 }
 
+// Example URLs from real recipe sites that typically have JSON-LD structured data
 const exampleUrls = [
-  { label: 'Chocolate Chip Cookies', url: 'https://example.com/best-chocolate-chip-cookies' },
-  { label: 'Tuscan Shrimp Pasta', url: 'https://example.com/creamy-tuscan-shrimp-pasta' },
-  { label: 'Chicken Noodle Soup', url: 'https://example.com/grandma-chicken-noodle-soup' },
+  { label: '🐟 Smoked Salmon', url: 'https://honest-food.net/how-to-smoke-salmon-recipe/' },
+  { label: '🍪 Cookies', url: 'https://www.allrecipes.com/recipe/10813/best-chocolate-chip-cookies/' },
+  { label: '🍝 Pasta', url: 'https://www.simplyrecipes.com/recipes/pasta_alla_norma/' },
+  { label: '🍗 Roast Chicken', url: 'https://www.foodnetwork.com/recipes/ina-garten/perfect-roast-chicken-recipe-1940592' },
 ];
 
 export function URLInput({ onExtract, isLoading, className }: URLInputProps) {
@@ -117,6 +119,8 @@ export function URLInput({ onExtract, isLoading, className }: URLInputProps) {
               onClick={() => {
                 setUrl(example.url);
                 setError('');
+                // Automatically trigger extraction for demo purposes
+                onExtract(example.url);
               }}
               disabled={isLoading}
               className="px-3 py-1.5 text-sm bg-white border border-gray-200 rounded-lg hover:border-orange-300 hover:bg-orange-50 hover:text-orange-600 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
